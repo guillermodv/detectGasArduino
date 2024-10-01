@@ -1,27 +1,24 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-// Lista de SSID y contraseñas
 const char* wifiNetworks[][2] = {
   {"prueba", "33042804"},
   {"Guillermo", "gallogallo"},
+  {"WIFIUtn", ""},
   {"prueba3", "password3"}
 };
 
 const int numOfNetworks = sizeof(wifiNetworks) / sizeof(wifiNetworks[0]);
 const int deviceID = 001;
 
-// Tu dirección de servidor
-String serverName = "http://localhost:3001/core/1/1";
+String serverName = "http://192.168.1.44:3001/core";
 
-// Variables de tiempo
 unsigned long lastTime = 0;
-unsigned long timerDelay = 5000;
+unsigned long timerDelay = 8000;
 
-// Pin del LED
-const int ledPin = 2;  // Cambia este pin según tu hardware
+const int ledPin = 2;  
 unsigned long ledBlinkInterval = 0;
-unsigned long previousMillis = 0; // Almacena el último tiempo de parpadeo
+unsigned long previousMillis = 0; 
 
 void connectToWiFi() {
   for (int i = 0; i < numOfNetworks; i++) {
@@ -31,10 +28,10 @@ void connectToWiFi() {
     WiFi.begin(wifiNetworks[i][0], wifiNetworks[i][1]);
 
     int attempt = 0;
-    while (WiFi.status() != WL_CONNECTED && attempt < 10) {  // Intentar 10 veces antes de cambiar de red
+    while (WiFi.status() != WL_CONNECTED && attempt < 10) { 
       delay(500);
       Serial.print(".");
-      ledBlinkInterval = 500; // Parpadeo medio mientras intenta conectar
+      ledBlinkInterval = 600; 
       blinkLED();
       attempt++;
     }
@@ -43,8 +40,8 @@ void connectToWiFi() {
       Serial.println("");
       Serial.print("Connected to WiFi network with IP Address: ");
       Serial.println(WiFi.localIP());
-      ledBlinkInterval = 1000; // Parpadeo lento cuando está conectado
-      return;  // Si la conexión fue exitosa, salir de la función
+      ledBlinkInterval = 1000; 
+      return; 
     }
 
     Serial.println("");
@@ -52,7 +49,7 @@ void connectToWiFi() {
   }
 
   Serial.println("Could not connect to any WiFi network.");
-  ledBlinkInterval = 100; // Parpadeo rápido si no está conectado
+  ledBlinkInterval = 80; 
 }
 
 void blinkLED() {
@@ -60,50 +57,47 @@ void blinkLED() {
   if (currentMillis - previousMillis >= ledBlinkInterval) {
     previousMillis = currentMillis;
     int ledState = digitalRead(ledPin);
-    digitalWrite(ledPin, !ledState);  // Invertir el estado del LED
+    digitalWrite(ledPin, !ledState); 
+  }
+}
+
+void sendGetRequest() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+
+    String serverPath = serverName + "/" + String(deviceID) + "/1";
+    http.begin(serverPath.c_str());
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode > 0) {
+      String response = http.getString();  // Obtener la respuesta del servidor
+      Serial.println("Respuesta del servidor: " + response);
+      ledBlinkInterval = 1000;  // Parpadeo lento cuando la solicitud es exitosa
+    } else {
+      Serial.print("Código de error: ");
+      Serial.println(httpResponseCode);
+      Serial.println("Reintentando en 8 segundos...");
+      ledBlinkInterval = 80;  // Parpadeo rápido si la solicitud falla
+      delay(5000);  
+    }
+    http.end();
+  } else {
+    Serial.println("WiFi desconectado");
+    connectToWiFi();  // Intentar reconectar si se pierde la conexión WiFi
   }
 }
 
 void setup() {
   Serial.begin(115200);
-  pinMode(ledPin, OUTPUT);  // Configurar el pin del LED como salida
+  pinMode(ledPin, OUTPUT);
   connectToWiFi();
   Serial.println("Timer set to 5 seconds (timerDelay variable), it will take 5 seconds before publishing the first reading.");
 }
 
 void loop() {
-  blinkLED();  // Llamar la función de parpadeo del LED en cada ciclo
-
-  // Enviar una solicitud HTTP POST cada 5 segundos
+  blinkLED();  
   if ((millis() - lastTime) > timerDelay) {
-    // Comprobar si la conexión WiFi está activa
-    if (WiFi.status() == WL_CONNECTED) {
-      HTTPClient http;
-      String serverPath = serverName;
-
-      http.begin(serverPath.c_str());
-
-      // Enviar solicitud GET
-      int httpResponseCode = http.GET();
-
-      if (httpResponseCode > 0) {
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
-        String payload = http.getString();
-        Serial.println(payload);
-      } else {
-        Serial.print("Error code: ");
-        Serial.println(httpResponseCode);
-      }
-
-      // Liberar recursos
-      http.end();
-    } else {
-      Serial.println("WiFi Disconnected");
-      connectToWiFi();  // Intentar reconectar si la conexión WiFi se pierde
-    }
+    sendGetRequest(); 
     lastTime = millis();
   }
 }
-
-
