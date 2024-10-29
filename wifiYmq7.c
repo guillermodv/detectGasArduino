@@ -1,7 +1,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-#define MQ7_PIN 2 
+#define MQ7_PIN A0
 
 const char* wifiNetworks[][2] = {
   {"prueba", "33042804"},
